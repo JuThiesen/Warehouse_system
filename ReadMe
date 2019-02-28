@@ -1,0 +1,371 @@
+Programming Task “Warehouse system” - Methods of AI
+____________________________________________________________________________________________________________
+
+This program is designed to run following local search algorithms: Hill Climbing, First Choice Hill Climbing, 
+Parallel Hill Climbing, Simulated Annealing and Local Beam Search. 
+It is shown by the example of a warehouse. You can import a warehouse configuration and an order list.
+____________________________________________________________________________________________________________
+
+This ReadMe contained:
+
+- Installation
+- Import warehouse configuration
+- Import order 
+- Hill Climbing
+- First Choice Hill Climbing
+- Parallel Hill Climbing
+- Simulated Annealing
+- Local Beam Search
+- Interface
+- Additional notes
+- Library
+____________________________________________________________________________________________________________
+
+To run the program double click the Warehouse_system.jar or 
+import the project to an IDE and run the program.
+The main class is in the Interface.java.
+When you run the program a Java Window will be pop up. 
+____________________________________________________________________________________________________________
+
+Import warehouse configuration
+
+You need to import a warehouse configuration as text file. The file must contain all items in the first line
+of the file, separated by space. Starting from the third line,the content of each PSU must be listed in a 
+own line. The same item can be listed in multiple PSU’s, but not twice in the same.
+
+valid import file structure example:
+
+item1 item2 item3 item4 item5
+
+item1 item3 item4 \n
+item2 item5 \n
+item1 item4 \n		
+
+The imported warehouse configuration will be handed over to the method “readProblem” which will read each 
+line of the file. It will create an array “items” of all items in the warehouse listed in the first line. 
+Also it will create a multidimensional array “psus” starting from line three, each PSU will be given a 
+number starting from 0. For each PSU the stored items will be placed in an array “psu_items”. 
+The actual item name will be replaced by numbers according to the position in the array “items”. 
+The arrays are handed over to the algorithms.
+
+	public static void readProblem(Path filepath) {
+		try {
+			List<String> lines = Files.readAllLines(filepath);				
+			String warehouse = lines.get(0);								
+			String[] items = warehouse.trim().split(" ");					
+			
+			int nr_psus = lines.size() - 2;								
+			int[][] psus = new int[nr_psus][0];							
+			for (int i = 2; i < lines.size(); i++) {						
+				String[] psu_items = lines.get(i).trim().split(" ");		
+				psus[i - 2] = new int[psu_items.length];					
+				for (int j = 0; j < psu_items.length; j++) {				
+					int index = Arrays.asList(items).indexOf(psu_items[j]);	
+					psus[i - 2][j] = index;
+				}
+			}
+			
+			Algorithms1.PSU_List = psus;									
+			Algorithms1.Items = items;										
+		}
+	}	
+																				Interface.java line 338-362						
+
+____________________________________________________________________________________________________________
+
+Import order 
+
+You need to import a order as text file. The file must contain all ordered items in the first line
+of the file, separated by space. 
+
+valid import file structure example:
+
+item1 item2 item3 item4 item5
+
+The imported order will be handed over to the method “readOrder” which will read all lines of the file. 
+It will create an array “items” of all items from the order, listed in the first line. An array “order list” 
+is created in which all items of the array “items” are stored. In the order list the name of the items are 
+replaced by numbers according to the position in the warehouse. The array is handed over to the algorithms.
+
+		public static void readOrder(Path filepath) {
+		try {
+			List<String> lines = Files.readAllLines(filepath);									
+			String[] items = lines.get(0).trim().split(" ");						
+			
+			int[] order_list = new int[items.length];								
+			for (int i = 0; i < items.length; i++) {								
+				int index = Arrays.asList(Algorithms1.Items).indexOf(items[i]);		
+				order_list[i] = index;
+			}
+					
+			Algorithms1.Orig_Order_List = order_list;		
+
+
+																			Interface.java line  368 -380
+___________________________________________________________________________________________________________
+
+Hill Climbing
+
+The method “Single_Hill_Climbing_Step is repeated until the order list is empty. After each step the current 
+PSU will be printed out with his identifier and stored items. Then the current order list will be converted 
+into a new order list in which all items already found are deleted.
+
+public static void Hill_Climbing () {
+		copy_Order_List();													
+		do {																
+			int current = Single_Hill_Climbing_Step();						
+			
+			if (Value(current) <= 0) {
+				continue;													
+			}
+			
+			String[] items = new String[PSU_List[current].length];			
+			for (int i = 0; i < items.length; i++) {
+				items[i] = Items[PSU_List[current][i]];
+			}
+			System.out.println("PSU " + (current + 1) + " " + Arrays.toString(items)); 			 
+			int[] new_List = new_Order_List(current);
+			Order_List = new_List; 											 
+		} while (Order_List.length > 0);											
+	}
+
+Algorithms1.java line 21-38
+
+The method “Single_Hill_Climbing_Step" starts with a random PSU which is then the current state. 
+Then the value of this PSU will be evaluated. For each item found from the order list, the counter 
+will increase by one. After that this value is compared to the value of the direct neighbors on the 
+right and left side. The current state will be replaced with the state of a direct neighbor if the
+value is higher. If both neighbors have a higher value the one with the highest is chosen. This step 
+will be repeated until there is no direct neighbor with higher value. The current state should be than
+a local maximum (it can fortuitously be the global maximum). 
+
+	public static int Single_Hill_Climbing_Step() {
+			int random_start = ThreadLocalRandom.current().nextInt(0, PSU_List.length);
+			int current = random_start;											
+			int current_value = Value(current);
+			int neighbor_value = 0;
+			do {																
+				int neighbor = Next_Improve_Neighbor(current);
+				neighbor_value = Value(neighbor);
+				
+				if (neighbor_value > current_value) {							
+					current = neighbor;
+					current_value = neighbor_value;
+				}
+				
+			} while (neighbor_value > current_value);							
+			
+			return current;														
+		}	
+
+Algorithms1.java line 125-142
+The used methods for this algorithm can be found in Algorithms1.java
+
+___________________________________________________________________________________________________________
+
+First Choice Hill Climbing
+
+The method starts with a random PSU which is the current state. Then the value of this PSU will be evaluated. 
+For each item found from the order list, the counter will increase by one. After that this value is compared 
+to the value of the direct neighbors on the right and left side. The current state will be replaced with the 
+state of a direct neighbor if the value is higher. If both neighbors have a higher value the one with the 
+highest is chosen. Different to classical Hill Climbing this step is not repeated until no neighbor with 
+higher value is found. The current PSU will be printed out with his identifier and stored items. Then the 
+current order list will be converted into a new order list in which all items already found are deleted. 
+This steps will be repeated until the order list is empty.
+
+	public static void First_Choice_Hill_Climbing () {
+			copy_Order_List();															
+			do {																		
+				int randomNum = ThreadLocalRandom.current().nextInt(0, PSU_List.length);  
+				int current = randomNum;									
+	
+				int neighbor = Next_Improve_Neighbor(current);							
+				current = neighbor;														
+					
+				
+				if (Value(current) <= 0) {												
+					continue;
+				}
+				
+				String[] items = new String[PSU_List[current].length];					
+				for (int i = 0; i < items.length; i++) {
+					items[i] = Items[PSU_List[current][i]];
+				}
+				System.out.println("PSU " + (current + 1) + " " + Arrays.toString(items));  
+				int[] new_List = new_Order_List(current);
+				Order_List = new_List; 													 
+			} while (Order_List.length > 0);										
+		}
+
+
+Algorithms1.java line 49-71
+The used methods for this algorithm can be found in Algorithms1.java
+___________________________________________________________________________________________________________
+
+Parallel Hill Climbing
+
+The method “Parallel_Hill_Climbing” executes each step of “Single_Hill_Climbing_Step” multiple times. 
+The times repeated is defined by the user. The highest value found in the first step is defined as current 
+state. This PSU will be printed out with its identifier and stored items. Then the current order list will 
+be converted into a new order list in which all items already found are deleted. This steps will be repeated 
+until the order list is empty.
+
+	public static void Parallel_Hill_Climbing (int parallel) {
+			copy_Order_List();																
+			do {																			
+				
+				int[] runs = new int[parallel];												
+				for (int i = 0; i < parallel; i++) {
+					runs[i] = Single_Hill_Climbing_Step();
+				}
+				int current = runs[0];											 
+				int best_value = Value(current);	
+				for (int i = 1; i < runs.length; i++) {										
+					if (Value(runs[i]) > best_value) {										
+						current = runs[i];	
+						best_value = Value(current);
+					}
+				}
+				
+				if (Value(current) <= 0) {													
+					continue;
+				}
+				
+				String[] items = new String[PSU_List[current].length];						
+				for (int i = 0; i < items.length; i++) {
+					items[i] = Items[PSU_List[current][i]];
+				}
+				System.out.println("PSU " + (current + 1) + " " + Arrays.toString(items));  
+				int[] new_List = new_Order_List(current);
+				Order_List = new_List; 														 
+			} while (Order_List.length > 0);									
+		}
+
+Algorithms1.java line 85 -114
+The used methods for this algorithm can be found in Algorithms1.java
+___________________________________________________________________________________________________________
+
+Simulated Annealing
+
+Note: the algorithms do not run and is excluded from the interface. The description given here is based on 
+the current structure of the code. 
+
+1. lies order und alle PSUs als Objekte der Klasse PSU ein
+2. in berechne in Klasse PSU den value der PSU anhand der Anzahl der fürs order benötigten items im PSU
+3. erstelle Klasse für neighborhood bestehend aus Lösungsinstanzen für order
+4. (d.h. erstelle Klasse für PSU-collections die Order erfüllen)
+5.instanziiere zufällige Lösung die die Order erfüllt
+6. vergleiche lösung mit anderen Lösungsinstanzen mit je einem unterschiedlichem PSU --> greedy
+7. je nach Temperatur besteht die Wahrscheinlichkeit dass ein PSU getauscht wird, dass die value verringert
+___________________________________________________________________________________________________________
+
+Local Beam Search
+
+Note: the algorithms do not run and is excluded from the interface. The description given here is based on 
+the current structure of the code. 
+
+The variable “order” is set to false. If the order is fulfilled the variable will be set to true. K initial 
+states are randomly generated, k equal to the number inserted by the user. Then the algorithm enters a 
+while-loop, that is executed as long as “order” equals false. Here all the neighbors of the k states are added 
+to a neighbor array. The value of the k current states (as given by the value function) are evaluated. 
+Afterwards the k best neighbors (the k neighbors, that yield the best values given by the value function) 
+are selected and then the values of the k current states are compared to the values of the k best neighbors. 
+If the value of a neighbor is lower than the one of a current state, the current state is kept, otherwise the 
+neighbor is switched with the current state. (This part is not working unfortunately). The algorithm then 
+continues and checks, whether the termination condition is met yet, namely whether we have all our ordered 
+items already gathered. If so, “order” is set to true and the algorithm stops and returns the k current states. 
+(This part is not working either). Otherwise the algorithm runs again until the termination condition is met.
+
+The code can be seen in Algoritms2.java
+___________________________________________________________________________________________________________
+
+Interface
+
+The code of the interface is mostly auto generated by JSwing (particular JFrame) itself.
+
+Import button: 
+By clicking the import button a file explorer will open where you can choose a file.
+A successful import will be displayed in the text area. You can always change the file to be imported.
+
+Example for a import button:
+
+		JButton button_import = new JButton("Import");					
+		button_import.addActionListener(new ActionListener() {			
+			public void actionPerformed(ActionEvent e) {				
+				String filename = "";								
+				String dir = "";
+				
+				JFileChooser c = new JFileChooser();				
+				int rVal = c.showOpenDialog(Interface.this);			
+				if (rVal == JFileChooser.APPROVE_OPTION) {			
+					filename = c.getSelectedFile().getName();			
+				    dir = c.getCurrentDirectory().toString();			
+				}
+				
+				Path p = Paths.get(dir, filename);						
+				String path = p.toString();
+				textArea_Output.setText(null);							
+				System.out.println("You imported the file: " + path);	
+				readProblem(p);											
+			}
+		});
+																				Interface.java line 106-125
+
+Run button:
+By clicking a run button one algorithm will be run.  There are two different types of run buttons.
+
+First type:
+The algorithm will be started immediately.
+
+Example for a run button of the first type:
+
+		JButton button_HC = new JButton("Run");							
+		button_HC.addActionListener(new ActionListener() {				
+			public void actionPerformed(ActionEvent e) {				
+				textArea_Output.setText(null);							
+				Algorithms1.Hill_Climbing();							
+			}
+		});
+
+
+Interface.java line 193 - 199
+
+Second type: 
+A window will pop in which the number of states must be inserted. 
+
+Example for a run button of the second type:
+
+			JButton button_PHC = new JButton("Run");							
+		button_PHC.addActionListener(new ActionListener() {					
+			public void actionPerformed(ActionEvent e) {					
+				
+				
+				int ans = Integer.parseInt(JOptionPane.showInputDialog(Interface.this, "Insert number of states", "Title", JOptionPane.INFORMATION_MESSAGE));
+				textArea_Output.setText(null);							
+				Algorithms1.Parallel_Hill_Climbing(ans);					
+			}
+		});
+                                                                                Interface.java line 242-252
+
+Output area
+
+The visible text area replaces the console. Everything will be printed in to this text area. 
+The method to overwrite the console was is copied from www.codejava.net.
+
+		PrintStream printStream = new PrintStream(new CustomOutputStream(textArea_Output)); 
+		System.setOut(printStream);
+		System.setErr(printStream);
+
+
+																				Interface.java line 325-327						
+____________________________________________________________________________________________________________
+
+Library
+
+JavaSE-1.8(jre1.8.0_11)
+____________________________________________________________________________________________________________
+
+Thank you for "ReadMe".
+____________________________________________________________________________________________________________
+____________________________________________________________________________________________________________
